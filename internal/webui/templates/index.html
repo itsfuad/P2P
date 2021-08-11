@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>P2P Mesh Network</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>P2P Mesh Network</h1>
+        </header>
+        
+        <div class="main">
+            <div class="peers-section">
+                <h2>Connected Peers</h2>
+                <div id="peers-list"></div>
+            </div>
+            
+            <div class="files-section">
+                <h2>Shared Files</h2>
+                <div id="files-list"></div>
+                <div class="upload-form">
+                    <input type="file" id="file-input">
+                    <button onclick="uploadFile()">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
