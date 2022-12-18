@@ -15,15 +15,15 @@ type Chunk struct {
 }
 
 type FileChunker struct {
-	file     io.Reader
-	chunks   []*Chunk
-	fileSize int64
+	File     io.Reader
+	Chunks   []*Chunk
+	FileSize int64
 }
 
 func NewFileChunker(file io.Reader, size int64) *FileChunker {
 	return &FileChunker{
-		file:     file,
-		fileSize: size,
+		File:     file,
+		FileSize: size,
 	}
 }
 
@@ -31,7 +31,7 @@ func (fc *FileChunker) Split() error {
 	var index uint64 = 0
 	for {
 		chunkData := make([]byte, ChunkSize)
-		n, err := fc.file.Read(chunkData)
+		n, err := fc.File.Read(chunkData)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("failed to read chunk: %w", err)
 		}
@@ -47,7 +47,7 @@ func (fc *FileChunker) Split() error {
 			Hash:  hash[:],
 			Data:  chunkData,
 		}
-		fc.chunks = append(fc.chunks, chunk)
+		fc.Chunks = append(fc.Chunks, chunk)
 		index++
 
 		if err == io.EOF {
@@ -58,8 +58,8 @@ func (fc *FileChunker) Split() error {
 }
 
 func (fc *FileChunker) GetChunk(index uint64) (*Chunk, error) {
-	if index >= uint64(len(fc.chunks)) {
+	if index >= uint64(len(fc.Chunks)) {
 		return nil, fmt.Errorf("chunk index out of range")
 	}
-	return fc.chunks[index], nil
+	return fc.Chunks[index], nil
 }

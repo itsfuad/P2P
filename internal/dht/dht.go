@@ -17,14 +17,14 @@ type Node struct {
 type DHT struct {
 	nodes   map[string]*Node
 	mu      sync.RWMutex
-	localID []byte
+	LocalID []byte
 }
 
 func NewDHT(address string) *DHT {
 	id := sha1.Sum([]byte(address))
 	return &DHT{
 		nodes:   make(map[string]*Node),
-		localID: id[:],
+		LocalID: id[:],
 	}
 }
 

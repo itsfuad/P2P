@@ -42,3 +42,9 @@ func (e *Encryptor) DecryptChunk(data []byte) ([]byte, error) {
 func (e *Encryptor) GetPrivateKey() *rsa.PrivateKey {
 	return e.privateKey
 }
+
+func ComputeHash(data []byte) []byte {
+	hasher := sha256.New()
+	hasher.Write(data)
+	return hasher.Sum(nil)
+}

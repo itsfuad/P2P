@@ -102,6 +102,18 @@ func (n *Node) startDHTService() {
 	}
 }
 
+func (n *Node) startFileServer() {
+	addr := fmt.Sprintf(":%d", n.config.Port+1)
+	http.HandleFunc("/files/", n.handleFileRequest)
+	log.Printf("File server listening on %s", addr)
+
+	go func() {
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			log.Fatalf("Failed to start file server: %v", err)
+		}
+	}()
+}
+
 func (n *Node) handleDHTConnection(conn net.Conn) {
 	defer conn.Close()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
@@ -205,7 +217,7 @@ func (n *Node) startDiscovery() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		knownNodes := n.dht.FindClosestNodes(n.dht.localID, 5)
+		knownNodes := n.dht.FindClosestNodes(n.dht.LocalID, 5)
 		for _, node := range knownNodes {
 			if node.Address == fmt.Sprintf("localhost:%d", n.config.Port) {
 				continue
@@ -275,7 +287,7 @@ func (n *Node) AddFile(filePath string) error {
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	err = enc.Encode(chunker.chunks)
+	err = enc.Encode(chunker.Chunks)
 	if err != nil {
 		return err
 	}
