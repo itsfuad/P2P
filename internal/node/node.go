@@ -72,6 +72,10 @@ func (n *Node) Start() error {
 	return nil
 }
 
+func (n *Node) Stop() {
+	n.cleanup()
+}
+
 func (n *Node) initializeSecurity() error {
 	enc, err := crypto.NewEncryptor()
 	if err != nil {
@@ -116,6 +120,12 @@ func (n *Node) startFileServer() {
 
 func (n *Node) handleDHTConnection(conn net.Conn) {
 	defer conn.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in DHT connection: %v", r)
+		}
+		n.cleanup()
+	}()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	for {
 		op, err := rw.ReadString('\n')
@@ -127,48 +137,9 @@ func (n *Node) handleDHTConnection(conn net.Conn) {
 
 		switch op {
 		case "PING":
-			_, err = rw.WriteString("PONG\n")
-			if err != nil {
-				log.Printf("DHT write error: %v", err)
-				return
-			}
-			err = rw.Flush()
-			if err != nil {
-				log.Printf("DHT flush error: %v", err)
-				return
-			}
+			n.handlePing(rw)
 		case "FIND_NODE":
-			targetIDStr, err := rw.ReadString('\n')
-			if err != nil {
-				log.Printf("DHT read error: %v", err)
-				return
-			}
-			targetIDStr = strings.TrimSpace(targetIDStr)
-			var targetID []byte
-			err = json.Unmarshal([]byte(targetIDStr), &targetID)
-			if err != nil {
-				log.Printf("DHT unmarshal error: %v", err)
-				return
-			}
-
-			closestNodes := n.dht.FindClosestNodes(targetID, 5)
-			respBytes, err := json.Marshal(closestNodes)
-			if err != nil {
-				log.Printf("DHT marshal error: %v", err)
-				return
-			}
-
-			_, err = rw.WriteString(string(respBytes) + "\n")
-			if err != nil {
-				log.Printf("DHT write error: %v", err)
-				return
-			}
-			err = rw.Flush()
-			if err != nil {
-				log.Printf("DHT flush error: %v", err)
-				return
-			}
-
+			n.handleFindNode(rw)
 		default:
 			log.Printf("DHT unknown operation: %s", op)
 			return
@@ -176,7 +147,59 @@ func (n *Node) handleDHTConnection(conn net.Conn) {
 	}
 }
 
+func (n *Node) handlePing(rw *bufio.ReadWriter) {
+	_, err := rw.WriteString("PONG\n")
+	if err != nil {
+		log.Printf("DHT write error: %v", err)
+		return
+	}
+	err = rw.Flush()
+	if err != nil {
+		log.Printf("DHT flush error: %v", err)
+		return
+	}
+}
+
+func (n *Node) handleFindNode(rw *bufio.ReadWriter) {
+	targetIDStr, err := rw.ReadString('\n')
+	if err != nil {
+		log.Printf("DHT read error: %v", err)
+		return
+	}
+	targetIDStr = strings.TrimSpace(targetIDStr)
+	var targetID []byte
+	err = json.Unmarshal([]byte(targetIDStr), &targetID)
+	if err != nil {
+		log.Printf("DHT unmarshal error: %v", err)
+		return
+	}
+
+	closestNodes := n.dht.FindClosestNodes(targetID, 5)
+	respBytes, err := json.Marshal(closestNodes)
+	if err != nil {
+		log.Printf("DHT marshal error: %v", err)
+		return
+	}
+
+	_, err = rw.WriteString(string(respBytes) + "\n")
+	if err != nil {
+		log.Printf("DHT write error: %v", err)
+		return
+	}
+	err = rw.Flush()
+	if err != nil {
+		log.Printf("DHT flush error: %v", err)
+		return
+	}
+}
+
 func (n *Node) handleFileRequest(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in file request: %v", r)
+		}
+		n.cleanup()
+	}()
 	filePath := r.URL.Path[len("/files/"):]
 	if filePath == "" {
 		http.Error(w, "File path is required", http.StatusBadRequest)
@@ -213,6 +236,12 @@ func (n *Node) handleFileRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *Node) startDiscovery() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in discovery: %v", r)
+		}
+		n.cleanup()
+	}()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
@@ -234,6 +263,7 @@ func (n *Node) attemptPeerConnection(address string) {
 		return
 	}
 	defer conn.Close()
+	defer func() { /* cleanup */ }()
 
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
@@ -257,17 +287,18 @@ func (n *Node) attemptPeerConnection(address string) {
 
 	if resp == "PONG" {
 		log.Printf("Successfully pinged peer %s", address)
-		n.addPeer(address)
+		n.AddPeer(address)
 	}
 }
 
-func (n *Node) addPeer(address string) {
+func (n *Node) AddPeer(address string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.peers[address] = &Peer{Address: address, LastSeen: time.Now()}
 }
 
 func (n *Node) AddFile(filePath string) error {
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
@@ -624,22 +655,6 @@ func (n *Node) GetFileNamesList() []string {
 	return fileNames
 }
 
-func (n *Node) GetPeerAddressesArray() []string {
-	addresses := make([]string, 0, len(n.peers))
-	for address := range n.peers {
-		addresses = append(addresses, address)
-	}
-	return addresses
-}
-
-func (n *Node) GetFileNamesArray() []string {
-	fileNames := make([]string, 0, len(n.files))
-	for fileName := range n.files {
-		fileNames = append(fileNames, fileName)
-	}
-	return fileNames
-}
-
 func (n *Node) GetPeerAddressesMap() map[string]*Peer {
 	return n.peers
 }
@@ -666,22 +681,6 @@ func (n *Node) GetFileNamesChannel() <-chan string {
 	return fileNameChan
 }
 
-func (n *Node) GetPeerAddressesSlice() []string {
-	addresses := make([]string, 0, len(n.peers))
-	for address := range n.peers {
-		addresses = append(addresses, address)
-	}
-	return addresses
-}
-
-func (n *Node) GetFileNamesSlice() []string {
-	fileNames := make([]string, 0, len(n.files))
-	for fileName := range n.files {
-		fileNames = append(fileNames, fileName)
-	}
-	return fileNames
-}
-
 func (n *Node) GetPeerAddressesSet() map[string]bool {
 	addressSet := make(map[string]bool)
 	for address := range n.peers {
@@ -696,22 +695,6 @@ func (n *Node) GetFileNamesSet() map[string]bool {
 		fileNameSet[fileName] = true
 	}
 	return fileNameSet
-}
-
-func (n *Node) GetPeerAddressesListCopy() []string {
-	addresses := make([]string, 0, len(n.peers))
-	for address := range n.peers {
-		addresses = append(addresses, address)
-	}
-	return addresses
-}
-
-func (n *Node) GetFileNamesListCopy() []string {
-	fileNames := make([]string, 0, len(n.files))
-	for fileName := range n.files {
-		fileNames = append(fileNames, fileName)
-	}
-	return fileNames
 }
 
 func (n *Node) GetPeerAddressesSorted() []string {
@@ -1190,4 +1173,25 @@ func ComputeHash(data []byte) []byte {
 	hasher := sha256.New()
 	hasher.Write(data)
 	return hasher.Sum(nil)
+}
+
+func (n *Node) cleanup() {
+	// Stop all services
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	// Clear peers
+	for addr := range n.peers {
+		delete(n.peers, addr)
+	}
+
+	// Clear files
+	for path := range n.files {
+		delete(n.files, path)
+	}
+
+	// Clear DHT nodes
+	if n.dht != nil {
+		n.dht.Nodes = make(map[string]*dht.Node)
+	}
 }

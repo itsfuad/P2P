@@ -1,4 +1,4 @@
-const clientID = Math.random().toString(36).substr(2, 9);
+const clientID = Math.random().toString(36).substring(2, 11);
 
 function pollUpdates() {
     fetch(`/api/updates?id=${clientID}`)

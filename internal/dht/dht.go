@@ -15,7 +15,7 @@ type Node struct {
 }
 
 type DHT struct {
-	nodes   map[string]*Node
+	Nodes   map[string]*Node
 	mu      sync.RWMutex
 	LocalID []byte
 }
@@ -23,7 +23,7 @@ type DHT struct {
 func NewDHT(address string) *DHT {
 	id := sha1.Sum([]byte(address))
 	return &DHT{
-		nodes:   make(map[string]*Node),
+		Nodes:   make(map[string]*Node),
 		LocalID: id[:],
 	}
 }
@@ -31,7 +31,7 @@ func NewDHT(address string) *DHT {
 func (d *DHT) AddNode(node *Node) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.nodes[string(node.ID)] = node
+	d.Nodes[string(node.ID)] = node
 }
 
 func (d *DHT) FindClosestNodes(target []byte, count int) []*Node {
@@ -39,7 +39,7 @@ func (d *DHT) FindClosestNodes(target []byte, count int) []*Node {
 	defer d.mu.RUnlock()
 
 	var nodeList []*Node
-	for _, node := range d.nodes {
+	for _, node := range d.Nodes {
 		nodeList = append(nodeList, node)
 	}
 

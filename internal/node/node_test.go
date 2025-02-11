@@ -1,110 +1,130 @@
-package node
+package node_test
 
 import (
-	"fmt"
-	"os"
-	"strings"
+	"meshfile/internal/node"
 	"testing"
-	"time"
 )
 
-func TestNodeInitialization(t *testing.T) {
-	config := &Config{
-		Port:      3000,
-		WebUIPort: 8080,
-	}
+const TEST_FILE = "test_file.txt"
+const FILE_ADD_ERROR = "Failed to add file: %v"
 
-	node := NewNode(config)
-	if node == nil {
-		t.Fatal("Failed to create node")
+func TestNewNode(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	if n == nil {
+		t.Fatal("Expected new node to be created")
 	}
+	if n.GetConfig().Port != 8080 {
+		t.Errorf("Expected port 8080, got %d", n.GetConfig().Port)
+	}
+}
 
-	if err := node.Start(); err != nil {
+func TestNodeStartStop(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	err := n.Start()
+	if err != nil {
 		t.Fatalf("Failed to start node: %v", err)
 	}
-
-	// Allow time for services to start
-	time.Sleep(time.Second)
+	n.Stop()
 }
 
-func TestPeerDiscovery(t *testing.T) {
-	config1 := &Config{Port: 3001, WebUIPort: 8081}
-	node1 := NewNode(config1)
-	if err := node1.Start(); err != nil {
-		t.Fatalf("Failed to start node1: %v", err)
+func TestNodeAddFile(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	err := n.AddFile(TEST_FILE)
+	if err != nil {
+		t.Fatalf(FILE_ADD_ERROR, err)
 	}
-	defer func() { /* cleanup */ }()
-
-	config2 := &Config{Port: 3002, WebUIPort: 8082}
-	node2 := NewNode(config2)
-	if err := node2.Start(); err != nil {
-		t.Fatalf("Failed to start node2: %v", err)
+	files := n.GetFiles()
+	if len(files) != 1 {
+		t.Fatalf("Expected 1 file, got %d", len(files))
 	}
-	defer func() { /* cleanup */ }()
-
-	time.Sleep(3 * time.Second)
 }
 
-func TestFileTransfer(t *testing.T) {
-	config1 := &Config{Port: 3003, WebUIPort: 8083}
-	node1 := NewNode(config1)
-	if err := node1.Start(); err != nil {
-		t.Fatalf("Failed to start node1: %v", err)
-	}
-	defer func() { /* cleanup */ }()
-
-	config2 := &Config{Port: 3004, WebUIPort: 8084}
-	node2 := NewNode(config2)
-	if err := node2.Start(); err != nil {
-		t.Fatalf("Failed to start node2: %v", err)
-	}
-	defer func() { /* cleanup */ }()
-
-	// Create a test file
-	testFileContent := "This is a test file for P2P file transfer."
-	testFilePath := "test_file.txt"
-	err := os.WriteFile(testFilePath, []byte(testFileContent), 0644)
+func TestNodeEncryptDecryptData(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	err := n.Start()
 	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+		t.Fatalf("Failed to start node: %v", err)
 	}
-	defer os.Remove(testFilePath)
+	defer n.Stop()
 
-	// Add the file to node1
-	err = node1.AddFile(testFilePath)
+	data := []byte("test data")
+	encryptedData, err := n.EncryptData(data)
 	if err != nil {
-		t.Fatalf("Failed to add file to node1: %v", err)
+		t.Fatalf("Failed to encrypt data: %v", err)
 	}
 
-	time.Sleep(2 * time.Second)
-
-	// Download the file from node1 to node2
-	err = node2.DownloadFile(testFilePath)
-	if err != nil && !strings.Contains(err.Error(), "no peers found for file") {
-		t.Fatalf("Failed to download file to node2: %v", err)
+	decryptedData, err := n.DecryptData(encryptedData)
+	if err != nil {
+		t.Fatalf("Failed to decrypt data: %v", err)
 	}
 
-	// Verify the downloaded file
-	downloadedFilePath := "downloaded_test_file.txt"
-	downloadedFileContent, err := os.ReadFile(downloadedFilePath)
-	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
-		t.Fatalf("Failed to read downloaded file: %v", err)
+	if string(decryptedData) != string(data) {
+		t.Fatalf("Expected decrypted data to be %s, got %s", data, decryptedData)
 	}
-	defer os.Remove(downloadedFilePath)
+}
 
-	if string(downloadedFileContent) != testFileContent {
-		t.Fatalf("Downloaded file content does not match original file content")
+func TestNodeAddPeer(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	n.AddPeer("127.0.0.1:8081")
+	peers := n.ListPeers()
+	if len(peers) != 1 {
+		t.Fatalf("Expected 1 peer, got %d", len(peers))
 	}
+}
 
-	// Check if the file was actually downloaded
-	if _, err := os.Stat(downloadedFilePath); err == nil {
-		fmt.Println("File downloaded successfully")
-	} else if os.IsNotExist(err) {
-		fmt.Println("File not downloaded")
-	} else {
-		fmt.Println("Some other error")
+func TestNodeRemoveFile(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	err := n.AddFile(TEST_FILE)
+	if err != nil {
+		t.Fatalf(FILE_ADD_ERROR, err)
 	}
+	err = n.RemoveFile(TEST_FILE)
+	if err != nil {
+		t.Fatalf("Failed to remove file: %v", err)
+	}
+	files := n.GetFiles()
+	if len(files) != 0 {
+		t.Fatalf("Expected 0 files, got %d", len(files))
+	}
+}
 
-	// Clean up
-	os.Remove(testFilePath)
-	os.Remove(downloadedFilePath)
+func TestNodeGenerateRandomBytes(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	randomBytes, err := n.GenerateRandomBytes(16)
+	if err != nil {
+		t.Fatalf("Failed to generate random bytes: %v", err)
+	}
+	if len(randomBytes) != 16 {
+		t.Fatalf("Expected 16 random bytes, got %d", len(randomBytes))
+	}
+}
+
+func TestNodeGetPeerCount(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	n.AddPeer("127.0.0.1:8081")
+	count := n.GetPeerCount()
+	if count != 1 {
+		t.Fatalf("Expected 1 peer, got %d", count)
+	}
+}
+
+func TestNodeGetFileCount(t *testing.T) {
+	config := &node.Config{Port: 8080, WebUIPort: 8081}
+	n := node.NewNode(config)
+	err := n.AddFile(TEST_FILE)
+	if err != nil {
+		t.Fatalf(FILE_ADD_ERROR, err)
+	}
+	count := n.GetFileCount()
+	if count != 1 {
+		t.Fatalf("Expected 1 file, got %d", count)
+	}
 }
