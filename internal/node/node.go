@@ -3,6 +3,7 @@ package node
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -30,14 +31,15 @@ type Config struct {
 }
 
 type Node struct {
-	config     *Config
-	peers      map[string]*Peer
-	files      map[string]*FileInfo
-	privateKey *rsa.PrivateKey
-	encryptor  *crypto.Encryptor
-	dht        *dht.DHT
-	mu         sync.RWMutex
-	fileServer	 	*http.Server
+	config             *Config
+	peers              map[string]*Peer
+	files              map[string]*FileInfo
+	privateKey         *rsa.PrivateKey
+	encryptor          *crypto.Encryptor
+	dht                *dht.DHT
+	mu                 sync.RWMutex
+	fileServer         *http.Server
+	fileHandlerPattern string
 }
 
 type Peer struct {
@@ -53,9 +55,10 @@ type FileInfo struct {
 
 func NewNode(config *Config) *Node {
 	return &Node{
-		config: config,
-		peers:  make(map[string]*Peer),
-		files:  make(map[string]*FileInfo),
+		config:             config,
+		peers:              make(map[string]*Peer),
+		files:              make(map[string]*FileInfo),
+		fileHandlerPattern: "/files/",
 	}
 }
 
@@ -75,6 +78,17 @@ func (n *Node) Start() error {
 
 func (n *Node) Stop() {
 	n.cleanup()
+
+	// Shutdown the file server if it exists
+	if n.fileServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := n.fileServer.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down file server: %v", err)
+		}
+	}
+
 	fmt.Printf("Node stopped, PORT: %d \n", n.config.Port)
 }
 
@@ -110,7 +124,8 @@ func (n *Node) startDHTService() {
 
 func (n *Node) startFileServer() {
 	addr := fmt.Sprintf(":%d", n.config.Port+1)
-	http.HandleFunc("/files/", n.handleFileRequest)
+
+	http.HandleFunc(n.fileHandlerPattern, n.handleFileRequest)
 	log.Printf("File server listening on %s", addr)
 
 	server := &http.Server{Addr: addr}
@@ -119,7 +134,7 @@ func (n *Node) startFileServer() {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start file server: %v", err)
+			log.Printf("File server error: %v", err)
 		}
 	}()
 }
@@ -309,6 +324,9 @@ func (n *Node) AddFile(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
+
+	fmt.Printf("File %s opened successfully\n", filePath)
+
 	defer file.Close()
 
 	fileInfo, err := file.Stat()

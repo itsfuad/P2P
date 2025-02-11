@@ -1,7 +1,6 @@
 package node_test
 
 import (
-	"io/ioutil"
 	"meshfile/internal/node"
 	"os"
 	"testing"
@@ -14,7 +13,7 @@ const FILE_ADD_ERROR = "Failed to add file: %v"
 
 // Test helper function to create a test file
 func createTestFile(t *testing.T) {
-	err := ioutil.WriteFile(TEST_FILE, []byte(TEST_DATA), 0644)
+	err := os.WriteFile(TEST_FILE, []byte(TEST_DATA), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
