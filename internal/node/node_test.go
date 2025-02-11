@@ -3,6 +3,7 @@ package node_test
 import (
 	"meshfile/internal/node"
 	"testing"
+	"os"
 )
 
 const TEST_FILE = "test_file.txt"
@@ -22,7 +23,7 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestNodeStartStop(t *testing.T) {
-    config := &node.Config{Port: 8080, WebUIPort: 8081} // Use dynamic ports
+    config := &node.Config{Port: 0, WebUIPort: 0} // Use dynamic ports
     n := node.NewNode(config)
     err := n.Start()
     if err != nil {
@@ -36,7 +37,15 @@ func TestNodeStartStop(t *testing.T) {
 func TestNodeAddFile(t *testing.T) {
 	config := &node.Config{Port: 8080, WebUIPort: 8081}
 	n := node.NewNode(config)
-	err := n.AddFile(TEST_FILE)
+
+	// Ensure the test file exists
+	_, err := os.Create(TEST_FILE)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	defer os.Remove(TEST_FILE)
+
+	err = n.AddFile(TEST_FILE)
 	if err != nil {
 		t.Fatalf(FILE_ADD_ERROR, err)
 	}
