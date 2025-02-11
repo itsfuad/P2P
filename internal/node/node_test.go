@@ -57,6 +57,7 @@ func TestNodeStartStop(t *testing.T) {
 }
 
 func TestNodeAddFile(t *testing.T) {
+
 	n := setupNode(t)
 	defer n.Stop()
 

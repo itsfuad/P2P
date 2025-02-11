@@ -123,18 +123,25 @@ func (n *Node) startDHTService() {
 }
 
 func (n *Node) startFileServer() {
-	addr := fmt.Sprintf(":%d", n.config.Port+1)
+	// Use WebUIPort (instead of config.Port+1) for the file server
+	addr := fmt.Sprintf(":%d", n.config.WebUIPort)
 
-	http.HandleFunc(n.fileHandlerPattern, n.handleFileRequest)
+	// Create a dedicated mux to avoid conflicts in tests
+	mux := http.NewServeMux()
+	mux.HandleFunc(n.fileHandlerPattern, n.handleFileRequest)
+
 	log.Printf("File server listening on %s", addr)
 
-	server := &http.Server{Addr: addr}
-
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
 	n.fileServer = server
 
+	// Launch the file server
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("File server error: %v", err)
+			log.Fatalf("File server ListenAndServe error: %v", err)
 		}
 	}()
 }
@@ -145,7 +152,7 @@ func (n *Node) handleDHTConnection(conn net.Conn) {
 		if r := recover(); r != nil {
 			log.Printf("Recovered from panic in DHT connection: %v", r)
 		}
-		n.cleanup()
+		//n.cleanup()
 	}()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	for {
@@ -219,7 +226,7 @@ func (n *Node) handleFileRequest(w http.ResponseWriter, r *http.Request) {
 		if r := recover(); r != nil {
 			log.Printf("Recovered from panic in file request: %v", r)
 		}
-		n.cleanup()
+		//n.cleanup()
 	}()
 	filePath := r.URL.Path[len("/files/"):]
 	if filePath == "" {
@@ -261,7 +268,7 @@ func (n *Node) startDiscovery() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered from panic in discovery: %v", r)
 		}
-		n.cleanup()
+		//n.cleanup()
 	}()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()

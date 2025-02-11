@@ -22,7 +22,11 @@ func main() {
 	nodeInstance = node.NewNode(config)
 	webui.SetNode(nodeInstance) // Set the node instance in the webui package
 
-	go webui.Start(*webUIPort)
+	go func() {
+		if err := webui.Start(*webUIPort); err != nil {
+			log.Fatalf("Web UI error: %v", err)
+		}
+	}()
 
 	if err := nodeInstance.Start(); err != nil {
 		log.Fatal(err)
