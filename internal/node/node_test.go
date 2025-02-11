@@ -17,17 +17,21 @@ func TestNewNode(t *testing.T) {
 	if n.GetConfig().Port != 8080 {
 		t.Errorf("Expected port 8080, got %d", n.GetConfig().Port)
 	}
+
+	defer n.Stop() // Ensure proper cleanup
 }
 
 func TestNodeStartStop(t *testing.T) {
-	config := &node.Config{Port: 8080, WebUIPort: 8081}
-	n := node.NewNode(config)
-	err := n.Start()
-	if err != nil {
-		t.Fatalf("Failed to start node: %v", err)
-	}
-	n.Stop()
+    config := &node.Config{Port: 8080, WebUIPort: 8081} // Use dynamic ports
+    n := node.NewNode(config)
+    err := n.Start()
+    if err != nil {
+        t.Fatalf("Failed to start node: %v", err)
+    }
+
+    defer n.Stop() // Ensure proper cleanup
 }
+
 
 func TestNodeAddFile(t *testing.T) {
 	config := &node.Config{Port: 8080, WebUIPort: 8081}
@@ -40,6 +44,8 @@ func TestNodeAddFile(t *testing.T) {
 	if len(files) != 1 {
 		t.Fatalf("Expected 1 file, got %d", len(files))
 	}
+
+	defer n.Stop() // Ensure proper cleanup
 }
 
 func TestNodeEncryptDecryptData(t *testing.T) {
@@ -49,8 +55,8 @@ func TestNodeEncryptDecryptData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start node: %v", err)
 	}
-	defer n.Stop()
 
+	
 	data := []byte("test data")
 	encryptedData, err := n.EncryptData(data)
 	if err != nil {
@@ -65,6 +71,8 @@ func TestNodeEncryptDecryptData(t *testing.T) {
 	if string(decryptedData) != string(data) {
 		t.Fatalf("Expected decrypted data to be %s, got %s", data, decryptedData)
 	}
+
+	defer n.Stop()
 }
 
 func TestNodeAddPeer(t *testing.T) {
@@ -75,6 +83,8 @@ func TestNodeAddPeer(t *testing.T) {
 	if len(peers) != 1 {
 		t.Fatalf("Expected 1 peer, got %d", len(peers))
 	}
+
+	defer n.Stop() // Ensure proper cleanup
 }
 
 func TestNodeRemoveFile(t *testing.T) {
@@ -92,6 +102,8 @@ func TestNodeRemoveFile(t *testing.T) {
 	if len(files) != 0 {
 		t.Fatalf("Expected 0 files, got %d", len(files))
 	}
+
+	defer n.Stop() // Ensure proper cleanup
 }
 
 func TestNodeGenerateRandomBytes(t *testing.T) {
@@ -104,6 +116,8 @@ func TestNodeGenerateRandomBytes(t *testing.T) {
 	if len(randomBytes) != 16 {
 		t.Fatalf("Expected 16 random bytes, got %d", len(randomBytes))
 	}
+
+	defer n.Stop()
 }
 
 func TestNodeGetPeerCount(t *testing.T) {
@@ -114,6 +128,8 @@ func TestNodeGetPeerCount(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("Expected 1 peer, got %d", count)
 	}
+
+	defer n.Stop() // Ensure proper cleanup
 }
 
 func TestNodeGetFileCount(t *testing.T) {
@@ -127,4 +143,6 @@ func TestNodeGetFileCount(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("Expected 1 file, got %d", count)
 	}
+
+	defer n.Stop() // Ensure proper cleanup
 }

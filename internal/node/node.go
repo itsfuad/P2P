@@ -37,6 +37,7 @@ type Node struct {
 	encryptor  *crypto.Encryptor
 	dht        *dht.DHT
 	mu         sync.RWMutex
+	fileServer	 	*http.Server
 }
 
 type Peer struct {
@@ -74,6 +75,7 @@ func (n *Node) Start() error {
 
 func (n *Node) Stop() {
 	n.cleanup()
+	fmt.Printf("Node stopped, PORT: %d \n", n.config.Port)
 }
 
 func (n *Node) initializeSecurity() error {
@@ -111,8 +113,12 @@ func (n *Node) startFileServer() {
 	http.HandleFunc("/files/", n.handleFileRequest)
 	log.Printf("File server listening on %s", addr)
 
+	server := &http.Server{Addr: addr}
+
+	n.fileServer = server
+
 	go func() {
-		if err := http.ListenAndServe(addr, nil); err != nil {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start file server: %v", err)
 		}
 	}()
