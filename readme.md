@@ -1,4 +1,4 @@
-# P2P Mesh Network
+# P2P Mesh Network (No longer maintained)
 
 This repository contains the source code for a P2P (Peer-to-Peer) Mesh Network application. The project is designed to facilitate file sharing and peer discovery in a decentralized manner.
 
