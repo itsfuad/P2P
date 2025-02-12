@@ -86,18 +86,6 @@ func handleUpdates(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func broadcastUpdate(update interface{}) {
-	updatesMu.RLock()
-	defer updatesMu.RUnlock()
-
-	for _, ch := range updates {
-		select {
-		case ch <- update:
-		default:
-		}
-	}
-}
-
 func handlePeers(w http.ResponseWriter, r *http.Request) {
 	if nodeInstance == nil {
 		http.Error(w, "Node not initialized", http.StatusInternalServerError)
