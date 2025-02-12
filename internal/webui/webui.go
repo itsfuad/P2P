@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -119,6 +121,39 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle file upload
+	if r.Method == http.MethodPost {
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Failed to get file from form", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Save the uploaded file temporarily (using the original filename)
+		out, err := os.Create(header.Filename)
+		if err != nil {
+			http.Error(w, "Failed to create file", http.StatusInternalServerError)
+			return
+		}
+		defer out.Close()
+
+		if _, err = io.Copy(out, file); err != nil {
+			http.Error(w, "Failed to save file", http.StatusInternalServerError)
+			return
+		}
+
+		// Add the file to node
+		if err = nodeInstance.AddFile(header.Filename); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to add file: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Handle GET request: list files
 	files := nodeInstance.ListFiles()
 	fileList := make([]map[string]interface{}, 0, len(files))
 	for _, file := range files {

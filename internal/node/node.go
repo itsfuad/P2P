@@ -124,7 +124,7 @@ func (n *Node) startDHTService() {
 
 func (n *Node) startFileServer() {
 	// Use WebUIPort (instead of config.Port+1) for the file server
-	addr := fmt.Sprintf(":%d", n.config.WebUIPort)
+	addr := fmt.Sprintf(":%d", n.config.WebUIPort+1)
 
 	// Create a dedicated mux to avoid conflicts in tests
 	mux := http.NewServeMux()

@@ -31,4 +31,6 @@ func main() {
 	if err := nodeInstance.Start(); err != nil {
 		log.Fatal(err)
 	}
+
+	select {}
 }
